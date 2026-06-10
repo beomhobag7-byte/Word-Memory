@@ -19,13 +19,20 @@ const db = mysql.createConnection({
   database: "word_memory"
 });
 
-db.connect((err) => {
-  if (err) {
-    console.error("MySQL 연결 실패:", err);
-    return;
-  }
-  console.log("MySQL 연결 성공!");
-});
+function connectDB() {
+  db.connect((err) => {
+    if (err) {
+      console.error("MySQL 연결 실패, 3초 후 재시도:", err.message);
+
+      setTimeout(connectDB, 3000);
+      return;
+    }
+
+    console.log("MySQL 연결 성공!");
+  });
+}
+
+connectDB();
 
 // 저장된 단어 전체 가져오기
 app.get("/api/words", (req, res) => {
