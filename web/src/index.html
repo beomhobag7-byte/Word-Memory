@@ -26,8 +26,11 @@
                 <span id="quiz-pos" class="text-xs font-semibold uppercase tracking-wider bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
                     -
                 </span>
+
                 <h2 id="quiz-word" class="text-4xl font-extrabold text-gray-900 mt-4 mb-2">단어를 등록해주세요</h2>
-                <p id="quiz-example" class="text-sm text-gray-500 italic mb-6">등록된 단어가 없으면 퀴즈를 풀 수 없습니다.</p>
+
+                <p id="quiz-example" class="text-sm text-gray-500 italic mb-2">등록된 단어가 없으면 퀴즈를 풀 수 없습니다.</p>
+                <p id="quiz-example-meaning" class="text-sm text-gray-500 mb-6"></p>
                
                 <div class="space-y-3">
                     <input type="text" id="user-answer" placeholder="뜻을 입력하세요"
@@ -58,7 +61,7 @@
                             </tr>
                         </thead>
                         <tbody id="wrong-notes-list" class="divide-y divide-gray-100 text-sm">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -67,15 +70,18 @@
         <section id="tab-add" class="tab-content hidden">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 max-w-md mx-auto">
                 <h2 class="text-xl font-bold mb-6 text-gray-900">➕ 새 단어 추가</h2>
+
                 <form id="word-form" onsubmit="saveWord(event)" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">단어 (Word)</label>
                         <input type="text" id="form-word" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="예: apple">
                     </div>
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">뜻 (Meaning)</label>
                         <input type="text" id="form-meaning" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="예: 사과">
                     </div>
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">품사 (Part of Speech)</label>
                         <select id="form-pos" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
@@ -85,10 +91,17 @@
                             <option value="Adverb">부사 (Adverb)</option>
                         </select>
                     </div>
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">예문 (Example Sentence)</label>
                         <textarea id="form-example" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="예: I eat an apple."></textarea>
                     </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">예문 뜻</label>
+                        <textarea id="form-example-meaning" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="예: 나는 사과를 먹는다."></textarea>
+                    </div>
+
                     <button type="submit" class="w-full bg-green-600 text-white py-2.5 rounded-lg font-semibold hover:bg-green-700 transition">
                         단어장에 저장하기
                     </button>
@@ -101,15 +114,34 @@
     <script>
         // --- 가상 데이터베이스 초기화 (localStorage 활용) ---
         if (!localStorage.getItem('words')) {
-            // 초기 더미 데이터 제공
             const defaultWords = [
-                { word_id: 1, word: 'challenge', meaning: '도전', part_of_speech: 'Noun', example_sentence: 'Life is full of challenges.' },
-                { word_id: 2, word: 'achieve', meaning: '성취하다', part_of_speech: 'Verb', example_sentence: 'You can achieve anything.' }
+                { 
+                    word_id: 1, 
+                    word: 'challenge', 
+                    meaning: '도전', 
+                    part_of_speech: 'Noun', 
+                    example_sentence: 'Life is full of challenges.',
+                    example_meaning: '인생은 도전으로 가득 차 있다.'
+                },
+                { 
+                    word_id: 2, 
+                    word: 'achieve', 
+                    meaning: '성취하다', 
+                    part_of_speech: 'Verb', 
+                    example_sentence: 'You can achieve anything.',
+                    example_meaning: '너는 무엇이든 성취할 수 있다.'
+                }
             ];
             localStorage.setItem('words', JSON.stringify(defaultWords));
         }
-        if (!localStorage.getItem('wrong_notes')) localStorage.setItem('wrong_notes', JSON.stringify([]));
-        if (!localStorage.getItem('quiz_logs')) localStorage.setItem('quiz_logs', JSON.stringify([]));
+
+        if (!localStorage.getItem('wrong_notes')) {
+            localStorage.setItem('wrong_notes', JSON.stringify([]));
+        }
+
+        if (!localStorage.getItem('quiz_logs')) {
+            localStorage.setItem('quiz_logs', JSON.stringify([]));
+        }
 
         let currentQuizWord = null;
 
@@ -124,8 +156,9 @@
 
         // --- 1. 랜덤 퀴즈 가져오기 ---
         function fetchRandomQuiz() {
-            const words = JSON.parse(localStorage.getItem('words'));
+            const words = JSON.parse(localStorage.getItem('words')) || [];
             const feedbackEl = document.getElementById('quiz-feedback');
+
             feedbackEl.classList.add('hidden');
             document.getElementById('user-answer').value = '';
 
@@ -133,18 +166,26 @@
                 document.getElementById('quiz-word').innerText = "단어장이 비어있습니다";
                 document.getElementById('quiz-pos').innerText = "-";
                 document.getElementById('quiz-example').innerText = "단어 등록 탭에서 단어를 먼저 추가해 주세요!";
+                document.getElementById('quiz-example-meaning').innerText = "";
                 document.getElementById('submit-btn').disabled = true;
                 return;
             }
 
             document.getElementById('submit-btn').disabled = false;
-            // 랜덤으로 하나 선택
+
             const randomIndex = Math.floor(Math.random() * words.length);
             currentQuizWord = words[randomIndex];
 
             document.getElementById('quiz-word').innerText = currentQuizWord.word;
             document.getElementById('quiz-pos').innerText = currentQuizWord.part_of_speech || 'N/A';
-            document.getElementById('quiz-example').innerText = currentQuizWord.example_sentence ? `"${currentQuizWord.example_sentence}"` : '';
+
+            document.getElementById('quiz-example').innerText = currentQuizWord.example_sentence 
+                ? `"${currentQuizWord.example_sentence}"`
+                : '';
+
+            document.getElementById('quiz-example-meaning').innerText = currentQuizWord.example_meaning
+                ? `뜻: ${currentQuizWord.example_meaning}`
+                : '';
         }
 
         // --- 2. 정답 제출 및 데이터 기록 ---
@@ -152,16 +193,22 @@
             if (!currentQuizWord) return;
 
             const userAnswer = document.getElementById('user-answer').value.trim();
-            if (!userAnswer) return alert('뜻을 입력해주세요!');
 
-            // 정답 판별 (유저 입력이 실제 뜻에 포함되어 있는지 간단 검사)
-            const isCorrect = currentQuizWord.meaning.replace(/\s+/g, '').includes(userAnswer.replace(/\s+/g, ''));
+            if (!userAnswer) {
+                alert('뜻을 입력해주세요!');
+                return;
+            }
+
+            const correctMeaning = currentQuizWord.meaning.replace(/\s+/g, '');
+            const userMeaning = userAnswer.replace(/\s+/g, '');
+            const isCorrect = correctMeaning.includes(userMeaning);
+
             const feedbackEl = document.getElementById('quiz-feedback');
 
             feedbackEl.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
 
-            // 퀴즈 로그 생성 (quiz_logs 테이블 시뮬레이션)
-            const logs = JSON.parse(localStorage.getItem('quiz_logs'));
+            const logs = JSON.parse(localStorage.getItem('quiz_logs')) || [];
+
             logs.push({
                 log_id: Date.now(),
                 word_id: currentQuizWord.word_id,
@@ -169,6 +216,7 @@
                 is_correct: isCorrect,
                 solved_at: new Date().toISOString()
             });
+
             localStorage.setItem('quiz_logs', JSON.stringify(logs));
 
             if (isCorrect) {
@@ -178,8 +226,7 @@
                 feedbackEl.innerText = `😢 틀렸습니다. 정답: ${currentQuizWord.meaning}`;
                 feedbackEl.classList.add('bg-red-100', 'text-red-700');
 
-                // 오답 노트 기록/업데이트 (wrong_notes 테이블 시뮬레이션)
-                const wrongNotes = JSON.parse(localStorage.getItem('wrong_notes'));
+                const wrongNotes = JSON.parse(localStorage.getItem('wrong_notes')) || [];
                 const existingNote = wrongNotes.find(n => n.word_id === currentQuizWord.word_id);
 
                 if (existingNote) {
@@ -193,17 +240,17 @@
                         last_wrong_at: new Date().toISOString()
                     });
                 }
+
                 localStorage.setItem('wrong_notes', JSON.stringify(wrongNotes));
             }
 
-            // 2초 후 다음 퀴즈 자동 출제
             setTimeout(fetchRandomQuiz, 2000);
         }
 
-        // --- 3. 오답 노트 조회 (JOIN 연산 시뮬레이션) ---
+        // --- 3. 오답 노트 조회 ---
         function fetchWrongNotes() {
-            const words = JSON.parse(localStorage.getItem('words'));
-            const wrongNotes = JSON.parse(localStorage.getItem('wrong_notes'));
+            const words = JSON.parse(localStorage.getItem('words')) || [];
+            const wrongNotes = JSON.parse(localStorage.getItem('wrong_notes')) || [];
             const tbody = document.getElementById('wrong-notes-list');
            
             document.getElementById('wrong-count-badge').innerText = wrongNotes.length;
@@ -214,12 +261,13 @@
                 return;
             }
 
-            // SQL의 WRONG_NOTES JOIN WORDS 연산 구현
             wrongNotes.forEach(note => {
                 const wordInfo = words.find(w => w.word_id === note.word_id);
-                if (!wordInfo) return; // 단어가 삭제된 경우 예외처리
+
+                if (!wordInfo) return;
 
                 const date = new Date(note.last_wrong_at).toLocaleDateString();
+
                 tbody.innerHTML += `
                     <tr class="hover:bg-gray-50 transition">
                         <td class="py-3 px-2 font-semibold text-gray-900">${wordInfo.word}</td>
@@ -236,13 +284,15 @@
         function saveWord(e) {
             e.preventDefault();
            
-            const words = JSON.parse(localStorage.getItem('words'));
+            const words = JSON.parse(localStorage.getItem('words')) || [];
+
             const newWord = {
-                word_id: Date.now(), // 고유 ID 대용
+                word_id: Date.now(),
                 word: document.getElementById('form-word').value.trim(),
                 meaning: document.getElementById('form-meaning').value.trim(),
                 part_of_speech: document.getElementById('form-pos').value,
-                example_sentence: document.getElementById('form-example').value.trim()
+                example_sentence: document.getElementById('form-example').value.trim(),
+                example_meaning: document.getElementById('form-example-meaning').value.trim()
             };
 
             words.push(newWord);
@@ -250,10 +300,10 @@
 
             alert('단어가 성공적으로 등록되었습니다! 📝');
             document.getElementById('word-form').reset();
-            switchTab('quiz'); // 등록 완료 후 퀴즈 화면으로 이동
+
+            switchTab('quiz');
         }
 
-        // 최초 실행 시 첫 번째 문제 출제
         fetchRandomQuiz();
     </script>
 </body>
