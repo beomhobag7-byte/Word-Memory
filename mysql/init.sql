@@ -1,4 +1,4 @@
-CREATE DATABASE word_memory;
+CREATE DATABASE IF NOT EXISTS word_memory;
 USE word_memory;
 
 CREATE TABLE words (
@@ -7,6 +7,7 @@ CREATE TABLE words (
     meaning VARCHAR(255) NOT NULL,
     part_of_speech VARCHAR(50),
     example_sentence TEXT,
+    example_meaning TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -15,7 +16,7 @@ CREATE TABLE wrong_notes (
     word_id INT NOT NULL,
     wrong_count INT DEFAULT 1,
     last_wrong_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   
+
     FOREIGN KEY (word_id) REFERENCES words(word_id)
         ON DELETE CASCADE
 );
