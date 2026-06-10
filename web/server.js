@@ -11,20 +11,21 @@ app.use(express.json());
 // HTML 파일 제공
 app.use(express.static(path.join(__dirname, "src")));
 
-// MySQL 연결
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: "mysql",
   user: "root",
   password: "1234",
-  database: "word_memory"
+  database: "word_memory",
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
-function connectDB() {
-  db.connect((err) => {
+function testDBConnection() {
+  db.query("SELECT 1", (err) => {
     if (err) {
       console.error("MySQL 연결 실패, 3초 후 재시도:", err.message);
-
-      setTimeout(connectDB, 3000);
+      setTimeout(testDBConnection, 3000);
       return;
     }
 
@@ -32,7 +33,7 @@ function connectDB() {
   });
 }
 
-connectDB();
+testDBConnection();
 
 // 저장된 단어 전체 가져오기
 app.get("/api/words", (req, res) => {
