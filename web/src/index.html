@@ -5,6 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Word Memory - 영어 단어 암기 서비스</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <style>
+        .correct-pop {
+            animation: correctPop 0.45s ease;
+        }
+
+        @keyframes correctPop {
+            0% {
+                transform: scale(1);
+            }
+            40% {
+                transform: scale(1.06);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .correct-effect {
+            position: fixed;
+            left: 50%;
+            top: 20%;
+            transform: translateX(-50%);
+            font-size: 32px;
+            animation: effectFloat 0.9s ease forwards;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        @keyframes effectFloat {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px) scale(0.8);
+            }
+            30% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-40px) scale(1.2);
+            }
+        }
+    </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
 
@@ -24,7 +67,7 @@
     <main class="max-w-4xl mx-auto px-4 py-8">
 
         <section id="tab-quiz" class="tab-content">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center max-w-md mx-auto">
+            <div id="quiz-card" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center max-w-md mx-auto">
                 <span id="quiz-pos" class="text-xs font-semibold uppercase tracking-wider bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">-</span>
 
                 <h2 id="quiz-word" class="text-4xl font-extrabold text-gray-900 mt-4 mb-2">단어를 등록해주세요</h2>
@@ -39,7 +82,15 @@
                     <button id="submit-btn" onclick="submitAnswer()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition shadow-sm">
                         정답 확인
                     </button>
+
+                    <button onclick="fetchRandomQuiz()" class="w-full bg-gray-100 text-gray-700 py-2.5 rounded-xl font-semibold hover:bg-gray-200 transition">
+                        다음 단어
+                    </button>
                 </div>
+
+                <p class="mt-4 text-xs text-gray-400">
+                    Enter: 정답 확인 / Space: 다음 단어
+                </p>
 
                 <div id="quiz-feedback" class="mt-4 p-3 rounded-xl text-sm font-medium hidden"></div>
             </div>
@@ -196,6 +247,24 @@
             if (tabName === "wrong") fetchWrongNotes();
         }
 
+        function showCorrectMotion() {
+            const quizCard = document.getElementById("quiz-card");
+
+            quizCard.classList.remove("correct-pop");
+            void quizCard.offsetWidth;
+            quizCard.classList.add("correct-pop");
+
+            const effect = document.createElement("div");
+            effect.className = "correct-effect";
+            effect.innerText = "🎉 정답!";
+
+            document.body.appendChild(effect);
+
+            setTimeout(() => {
+                effect.remove();
+            }, 900);
+        }
+
         async function fetchRandomQuiz() {
             const feedbackEl = document.getElementById("quiz-feedback");
             feedbackEl.classList.add("hidden");
@@ -259,6 +328,7 @@
                 if (isCorrect) {
                     feedbackEl.innerText = `🎉 정답입니다! (${currentQuizWord.meaning})`;
                     feedbackEl.classList.add("bg-green-100", "text-green-700");
+                    showCorrectMotion();
                 } else {
                     feedbackEl.innerText = `😢 틀렸습니다. 정답: ${currentQuizWord.meaning}`;
                     feedbackEl.classList.add("bg-red-100", "text-red-700");
@@ -523,6 +593,33 @@
                 resultBox.classList.add("bg-red-100", "text-red-700");
             }
         }
+
+        document.addEventListener("keydown", function(event) {
+            const quizTab = document.getElementById("tab-quiz");
+
+            if (quizTab.classList.contains("hidden")) {
+                return;
+            }
+
+            const activeElement = document.activeElement;
+            const isTyping =
+                activeElement.tagName === "INPUT" ||
+                activeElement.tagName === "TEXTAREA";
+
+            if (event.key === "Enter") {
+                event.preventDefault();
+                submitAnswer();
+            }
+
+            if (event.key === " ") {
+                if (isTyping) {
+                    return;
+                }
+
+                event.preventDefault();
+                fetchRandomQuiz();
+            }
+        });
 
         fetchRandomQuiz();
     </script>
