@@ -5,10 +5,10 @@ const path = require("path");
 
 const app = express();
 
+const ADMIN_CODE = "rockclub007#";
+
 app.use(cors());
 app.use(express.json());
-
-// HTML 파일 제공
 app.use(express.static(path.join(__dirname, "src")));
 
 const db = mysql.createPool({
@@ -35,7 +35,17 @@ function testDBConnection() {
 
 testDBConnection();
 
-// 저장된 단어 전체 가져오기
+function checkAdmin(req, res) {
+  const { admin_code } = req.body;
+
+  if (admin_code !== ADMIN_CODE) {
+    res.status(403).json({ error: "관리자만 사용할 수 있는 기능입니다." });
+    return false;
+  }
+
+  return true;
+}
+
 app.get("/api/words", (req, res) => {
   const sql = `
     SELECT 
@@ -61,7 +71,6 @@ app.get("/api/words", (req, res) => {
   });
 });
 
-// 랜덤 퀴즈 단어 하나 가져오기
 app.get("/api/quiz", (req, res) => {
   const sql = `
     SELECT 
@@ -92,8 +101,9 @@ app.get("/api/quiz", (req, res) => {
   });
 });
 
-// 새 단어 저장하기
 app.post("/api/words", (req, res) => {
+  if (!checkAdmin(req, res)) return;
+
   const {
     word,
     meaning,
@@ -108,20 +118,14 @@ app.post("/api/words", (req, res) => {
   }
 
   const sql = `
-    INSERT INTO words 
+    INSERT INTO words
     (word, meaning, part_of_speech, example_sentence, example_meaning)
     VALUES (?, ?, ?, ?, ?)
   `;
 
   db.query(
     sql,
-    [
-      word,
-      meaning,
-      part_of_speech,
-      example_sentence,
-      example_meaning
-    ],
+    [word, meaning, part_of_speech, example_sentence, example_meaning],
     (err, result) => {
       if (err) {
         console.error("단어 저장 실패:", err);
@@ -137,7 +141,78 @@ app.post("/api/words", (req, res) => {
   );
 });
 
-// 퀴즈 기록 저장하기
+app.post("/api/words/bulk", (req, res) => {
+  if (!checkAdmin(req, res)) return;
+
+  const { words } = req.body;
+
+  if (!Array.isArray(words) || words.length === 0) {
+    res.status(400).json({ error: "저장할 단어가 없습니다." });
+    return;
+  }
+
+  const values = words
+    .filter(item => item.word && item.meaning)
+    .map(item => [
+      item.word,
+      item.meaning,
+      item.part_of_speech || "",
+      item.example_sentence || "",
+      item.example_meaning || ""
+    ]);
+
+  if (values.length === 0) {
+    res.status(400).json({ error: "올바른 단어 데이터가 없습니다." });
+    return;
+  }
+
+  const sql = `
+    INSERT INTO words
+    (word, meaning, part_of_speech, example_sentence, example_meaning)
+    VALUES ?
+  `;
+
+  db.query(sql, [values], (err, result) => {
+    if (err) {
+      console.error("여러 단어 저장 실패:", err);
+      res.status(500).json({ error: "여러 단어 저장 실패" });
+      return;
+    }
+
+    res.json({
+      message: "여러 단어 저장 성공",
+      inserted_count: result.affectedRows
+    });
+  });
+});
+
+app.delete("/api/words/:id", (req, res) => {
+  const { admin_code } = req.body;
+
+  if (admin_code !== ADMIN_CODE) {
+    res.status(403).json({ error: "관리자만 단어를 삭제할 수 있습니다." });
+    return;
+  }
+
+  const wordId = req.params.id;
+  const sql = "DELETE FROM words WHERE word_id = ?";
+
+  db.query(sql, [wordId], (err, result) => {
+    if (err) {
+      console.error("단어 삭제 실패:", err);
+      res.status(500).json({ error: "단어 삭제 실패" });
+      return;
+    }
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "삭제할 단어를 찾지 못했습니다." });
+      return;
+    }
+
+    res.json({ message: "단어 삭제 성공" });
+  });
+});
+
 app.post("/api/quiz-logs", (req, res) => {
   const { word_id, user_answer, is_correct } = req.body;
 
@@ -161,7 +236,6 @@ app.post("/api/quiz-logs", (req, res) => {
   });
 });
 
-// 오답 노트 저장 또는 업데이트하기
 app.post("/api/wrong-notes", (req, res) => {
   const { word_id } = req.body;
 
@@ -214,7 +288,6 @@ app.post("/api/wrong-notes", (req, res) => {
   });
 });
 
-// 오답 노트 가져오기
 app.get("/api/wrong-notes", (req, res) => {
   const sql = `
     SELECT 
