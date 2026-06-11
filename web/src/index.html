@@ -39,7 +39,15 @@
                     <button id="submit-btn" onclick="submitAnswer()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition shadow-sm">
                         정답 확인
                     </button>
+
+                    <button onclick="fetchRandomQuiz()" class="w-full bg-gray-100 text-gray-700 py-2.5 rounded-xl font-semibold hover:bg-gray-200 transition">
+                        다음 단어
+                    </button>
                 </div>
+
+                <p class="mt-4 text-xs text-gray-400">
+                    Enter: 정답 확인 / Space: 다음 단어
+                </p>
 
                 <div id="quiz-feedback" class="mt-4 p-3 rounded-xl text-sm font-medium hidden"></div>
             </div>
@@ -523,6 +531,33 @@
                 resultBox.classList.add("bg-red-100", "text-red-700");
             }
         }
+
+        document.addEventListener("keydown", function(event) {
+            const quizTab = document.getElementById("tab-quiz");
+
+            if (quizTab.classList.contains("hidden")) {
+                return;
+            }
+
+            const activeElement = document.activeElement;
+            const isTyping =
+                activeElement.tagName === "INPUT" ||
+                activeElement.tagName === "TEXTAREA";
+
+            if (event.key === "Enter") {
+                event.preventDefault();
+                submitAnswer();
+            }
+
+            if (event.key === " ") {
+                if (isTyping) {
+                    return;
+                }
+
+                event.preventDefault();
+                fetchRandomQuiz();
+            }
+        });
 
         fetchRandomQuiz();
     </script>
