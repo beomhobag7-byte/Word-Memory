@@ -1484,28 +1484,41 @@ important, 중요한, Adjective"></textarea>
             document.getElementById("bulk-input").value = "";
         }
 
-        document.addEventListener("keydown", function(event) {
-            const quizTab = document.getElementById("tab-quiz");
+ let isCheckingAnswer = false;
 
-            if (!quizTab || quizTab.classList.contains("hidden")) return;
+document.addEventListener("keydown", function(event) {
+    const quizTab = document.getElementById("tab-quiz");
 
-            const activeElement = document.activeElement;
-            const isTyping =
-                activeElement.tagName === "INPUT" ||
-                activeElement.tagName === "TEXTAREA";
+    if (quizTab.classList.contains("hidden")) return;
 
-            if (event.key === "Enter") {
-                event.preventDefault();
-                submitAnswer();
-            }
+    const activeElement = document.activeElement;
+    const isTyping =
+        activeElement.tagName === "INPUT" ||
+        activeElement.tagName === "TEXTAREA";
 
-            if (event.key === " ") {
-                if (isTyping) return;
+    if (event.key === "Enter") {
+        event.preventDefault();
 
-                event.preventDefault();
-                fetchRandomQuiz();
-            }
-        });
+        if (isCheckingAnswer) return;
+
+        const answerInput = document.getElementById("user-answer");
+        if (!answerInput.value.trim()) return;
+
+        isCheckingAnswer = true;
+        submitAnswer();
+
+        setTimeout(() => {
+            isCheckingAnswer = false;
+        }, 800);
+    }
+
+    if (event.key === " ") {
+        if (isTyping) return;
+
+        event.preventDefault();
+        fetchRandomQuiz();
+    }
+});
 
         updateStatus();
     </script>
