@@ -272,6 +272,20 @@
 
             <section id="tab-quiz" class="tab-content hidden">
                 <div id="quiz-card" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center max-w-md mx-auto">
+
+                    <div class="mb-4">
+                        <select id="quiz-mode" onchange="changeQuizMode()"
+                                class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                            <option value="word-to-meaning">단어 보고 뜻 맞추기</option>
+                            <option value="meaning-to-word">뜻 보고 단어 맞추기</option>
+                            <option value="mixed">섞어서 출제</option>
+                        </select>
+                    </div>
+
+                    <p id="quiz-mode-label" class="text-sm text-gray-500 mb-2">
+                        단어를 보고 뜻을 맞춰보세요.
+                    </p>
+
                     <span id="quiz-pos" class="text-xs font-semibold uppercase tracking-wider bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">-</span>
 
                     <h2 id="quiz-word" class="text-4xl font-extrabold text-gray-900 mt-4 mb-2">세트를 선택해주세요</h2>
@@ -285,6 +299,10 @@
 
                         <button id="submit-btn" onclick="submitAnswer()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700">
                             정답 확인
+                        </button>
+
+                        <button onclick="restartQuizPool()" class="w-full bg-yellow-100 text-yellow-800 py-2.5 rounded-xl font-semibold hover:bg-yellow-200">
+                            처음부터 다시 풀기
                         </button>
 
                         <button onclick="fetchRandomQuiz()" class="w-full bg-gray-100 text-gray-700 py-2.5 rounded-xl font-semibold hover:bg-gray-200">
@@ -402,7 +420,11 @@ important, 중요한, Adjective"></textarea>
     </div>
         <script>
         let currentQuizWord = null;
+        let currentQuizType = "word-to-meaning";
+        let quizMode = "word-to-meaning";
         let quizAutoTimer = null;
+        let quizPool = [];
+
         let currentUser = JSON.parse(localStorage.getItem("currentUser")) || null;
         let currentSet = JSON.parse(localStorage.getItem("currentSet")) || null;
         let adminCode = localStorage.getItem("adminCode") || "";
@@ -829,6 +851,9 @@ important, 중요한, Adjective"></textarea>
                 unlockedSetPasswords[setInfo.set_id] = password;
                 localStorage.setItem("unlockedSetPasswords", JSON.stringify(unlockedSetPasswords));
             }
+
+            quizPool = [];
+            currentQuizWord = null;
 
             currentSet = setInfo;
             localStorage.setItem("currentSet", JSON.stringify(currentSet));
@@ -1260,6 +1285,78 @@ important, 중요한, Adjective"></textarea>
             }, 900);
         }
 
+        function normalizeAnswer(text) {
+            return String(text || "")
+                .toLowerCase()
+                .replace(/\s+/g, "")
+                .replace(/[.,!?'"`~]/g, "");
+        }
+
+        function changeQuizMode() {
+            const modeSelect = document.getElementById("quiz-mode");
+            quizMode = modeSelect.value;
+
+            quizPool = [];
+            currentQuizWord = null;
+
+            fetchRandomQuiz();
+        }
+
+        function getCurrentQuizType() {
+            if (quizMode === "mixed") {
+                return Math.random() < 0.5 ? "word-to-meaning" : "meaning-to-word";
+            }
+
+            return quizMode;
+        }
+
+        async function loadQuizPool() {
+            if (!currentSet) return [];
+
+            const codeToSend = adminVerified ? adminCode : "";
+            const url = `/api/words?set_id=${currentSet.set_id}&user_id=${getUserId()}&admin_code=${encodeURIComponent(codeToSend)}&set_password=${encodeURIComponent(getSetPassword())}`;
+
+            const response = await fetch(url);
+            const words = await response.json();
+
+            if (!response.ok) {
+                alert(words.error || "단어 목록을 불러오지 못했습니다.");
+                return [];
+            }
+
+            quizPool = words.sort(() => Math.random() - 0.5);
+            return quizPool;
+        }
+
+        function moveWrongWordToBack() {
+            if (quizPool.length <= 1) return;
+
+            const wrongWord = quizPool.shift();
+            quizPool.push(wrongWord);
+        }
+
+        function removeCorrectWord() {
+            if (quizPool.length === 0) return;
+
+            if (
+                currentQuizWord &&
+                Number(quizPool[0].word_id) === Number(currentQuizWord.word_id)
+            ) {
+                quizPool.shift();
+                return;
+            }
+
+            quizPool = quizPool.filter(
+                word => Number(word.word_id) !== Number(currentQuizWord.word_id)
+            );
+        }
+
+        function restartQuizPool() {
+            quizPool = [];
+            currentQuizWord = null;
+            fetchRandomQuiz();
+        }
+
         async function fetchRandomQuiz() {
             if (quizAutoTimer) {
                 clearTimeout(quizAutoTimer);
@@ -1272,6 +1369,7 @@ important, 중요한, Adjective"></textarea>
             const quizPosEl = document.getElementById("quiz-pos");
             const quizExampleEl = document.getElementById("quiz-example");
             const quizExampleMeaningEl = document.getElementById("quiz-example-meaning");
+            const quizModeLabel = document.getElementById("quiz-mode-label");
 
             feedbackEl.classList.add("hidden");
             answerInput.value = "";
@@ -1280,43 +1378,51 @@ important, 중요한, Adjective"></textarea>
                 currentQuizWord = null;
                 quizWordEl.innerText = "세트를 선택해주세요";
                 quizPosEl.innerText = "-";
-                quizExampleEl.innerText = "세트 선택 탭에서 단어 세트를 먼저 선택하세요.";
+                quizModeLabel.innerText = "세트 선택 탭에서 단어 세트를 먼저 선택하세요.";
+                quizExampleEl.innerText = "";
                 quizExampleMeaningEl.innerText = "";
                 return;
             }
 
-            currentQuizWord = null;
-            quizWordEl.innerText = "불러오는 중...";
-            quizPosEl.innerText = "-";
-            quizExampleEl.innerText = "";
-            quizExampleMeaningEl.innerText = "";
-
-            const codeToSend = adminVerified ? adminCode : "";
-            const url = `/api/quiz?set_id=${currentSet.set_id}&user_id=${getUserId()}&admin_code=${encodeURIComponent(codeToSend)}&set_password=${encodeURIComponent(getSetPassword())}`;
-
-            const response = await fetch(url);
-            const data = await response.json();
-
-            if (!response.ok) {
-                quizWordEl.innerText = "퀴즈 불러오기 실패";
-                alert(data.error || "퀴즈를 불러오지 못했습니다.");
-                return;
+            if (quizPool.length === 0) {
+                await loadQuizPool();
             }
 
-            if (!data) {
+            if (quizPool.length === 0) {
                 currentQuizWord = null;
-                quizWordEl.innerText = "단어가 없습니다";
+                quizWordEl.innerText = "완료!";
                 quizPosEl.innerText = "-";
-                quizExampleEl.innerText = "이 세트에 단어를 추가해주세요.";
+                quizModeLabel.innerText = "모든 단어를 맞췄거나 등록된 단어가 없습니다.";
+                quizExampleEl.innerText = "다시 풀려면 '처음부터 다시 풀기' 버튼을 누르세요.";
                 quizExampleMeaningEl.innerText = "";
                 return;
             }
 
-            currentQuizWord = data;
-            quizWordEl.innerText = data.word;
-            quizPosEl.innerText = data.part_of_speech || "-";
-            quizExampleEl.innerText = data.example_sentence ? `"${data.example_sentence}"` : "";
-            quizExampleMeaningEl.innerText = data.example_meaning ? `뜻: ${data.example_meaning}` : "";
+            currentQuizWord = quizPool[0];
+            currentQuizType = getCurrentQuizType();
+
+            quizPosEl.innerText = currentQuizWord.part_of_speech || "-";
+
+            if (currentQuizType === "word-to-meaning") {
+                quizWordEl.innerText = currentQuizWord.word;
+                quizModeLabel.innerText = "단어를 보고 뜻을 맞춰보세요.";
+                answerInput.placeholder = "뜻을 입력하세요";
+
+                quizExampleEl.innerText = currentQuizWord.example_sentence
+                    ? `"${currentQuizWord.example_sentence}"`
+                    : "";
+
+                quizExampleMeaningEl.innerText = currentQuizWord.example_meaning
+                    ? `뜻: ${currentQuizWord.example_meaning}`
+                    : "";
+            } else {
+                quizWordEl.innerText = currentQuizWord.meaning;
+                quizModeLabel.innerText = "뜻을 보고 영어 단어를 맞춰보세요.";
+                answerInput.placeholder = "영어 단어를 입력하세요";
+                quizExampleEl.innerText = "";
+                quizExampleMeaningEl.innerText = "";
+            }
+
             answerInput.focus();
         }
 
@@ -1326,16 +1432,39 @@ important, 중요한, Adjective"></textarea>
             const userAnswer = document.getElementById("user-answer").value.trim();
 
             if (!userAnswer) {
-                alert("뜻을 입력해주세요.");
+                alert("답을 입력해주세요.");
                 return;
             }
 
-            const correctMeaning = currentQuizWord.meaning.replace(/\s+/g, "");
-            const userMeaning = userAnswer.replace(/\s+/g, "");
-            const isCorrect = correctMeaning.includes(userMeaning);
+            let correctAnswer = "";
+
+            if (currentQuizType === "word-to-meaning") {
+                correctAnswer = currentQuizWord.meaning;
+            } else {
+                correctAnswer = currentQuizWord.word;
+            }
+
+            const userNormalized = normalizeAnswer(userAnswer);
+            const correctNormalized = normalizeAnswer(correctAnswer);
+
+            let isCorrect = false;
+
+            if (currentQuizType === "word-to-meaning") {
+                isCorrect =
+                    correctNormalized.includes(userNormalized) ||
+                    userNormalized.includes(correctNormalized);
+            } else {
+                isCorrect = userNormalized === correctNormalized;
+            }
 
             const feedbackEl = document.getElementById("quiz-feedback");
-            feedbackEl.classList.remove("hidden", "bg-green-100", "text-green-700", "bg-red-100", "text-red-700");
+            feedbackEl.classList.remove(
+                "hidden",
+                "bg-green-100",
+                "text-green-700",
+                "bg-red-100",
+                "text-red-700"
+            );
 
             await fetch("/api/quiz-logs", {
                 method: "POST",
@@ -1349,12 +1478,16 @@ important, 중요한, Adjective"></textarea>
             });
 
             if (isCorrect) {
-                feedbackEl.innerText = `🎉 정답입니다! (${currentQuizWord.meaning})`;
+                feedbackEl.innerText = `🎉 정답입니다! (${correctAnswer})`;
                 feedbackEl.classList.add("bg-green-100", "text-green-700");
                 showCorrectMotion();
+
+                removeCorrectWord();
             } else {
-                feedbackEl.innerText = `😢 틀렸습니다. 정답: ${currentQuizWord.meaning}`;
+                feedbackEl.innerText = `😢 틀렸습니다. 정답: ${correctAnswer}`;
                 feedbackEl.classList.add("bg-red-100", "text-red-700");
+
+                moveWrongWordToBack();
 
                 await fetch("/api/wrong-notes", {
                     method: "POST",
@@ -1531,6 +1664,8 @@ important, 중요한, Adjective"></textarea>
 
             alert("단어가 저장되었습니다.");
             document.getElementById("word-form").reset();
+
+            quizPool = [];
             fetchRandomQuiz();
         }
 
@@ -1641,6 +1776,7 @@ important, 중요한, Adjective"></textarea>
             resultBox.classList.add("bg-green-100", "text-green-700");
 
             document.getElementById("bulk-input").value = "";
+            quizPool = [];
         }
 
         let isCheckingAnswer = false;
